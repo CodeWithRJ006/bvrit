@@ -5,9 +5,10 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+// Uses Render's port if available, otherwise defaults to 3000 locally
+const PORT = process.env.PORT || 3000; 
 
-// Global Cache-Control Headers to prevent browser caching
+// GLOBAL CACHE BUSTER - Forces browsers to never load ghost data
 app.use((req, res, next) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.set('Pragma', 'no-cache');
@@ -33,9 +34,12 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+// 2. Serve Static Files (For Render Deployment & Uploads)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// This serves your frontend folder so the whole app runs on one link
+app.use(express.static(path.join(__dirname, '../frontend')));
 
-// 2. Vanguard In-Memory Core
+// 3. Vanguard In-Memory Core Database
 let database = {
     generalPoints: [], facultyJoinedRelieved: [], facultyAchievements: [],
     studentAchievements: [], departmentAchievements: [], facultyEvents: [],
@@ -44,12 +48,14 @@ let database = {
     vedicPrograms: [], placements: [], mous: [], skillDevelopment: []
 };
 
-// 3. API ROUTES
+// 4. API ROUTES
+
+// Fetch All Telemetry Data
 app.get('/api/report', (req, res) => {
     res.json({ status: "success", data: database });
 });
 
-// The upload.single middleware won't crash if the file is missing
+// Commit New Record (File is OPTIONAL here)
 app.post('/api/report/:section', upload.single('proofDocument'), (req, res) => {
     const section = req.params.section;
     if (!database[section]) return res.status(400).json({ error: "Invalid System Module." });
@@ -61,21 +67,23 @@ app.post('/api/report/:section', upload.single('proofDocument'), (req, res) => {
         ...recordData 
     };
 
-    // Safely handle optional files
+    // Safely handles optional files (saves null if skipped)
     if (req.file) newEntry.proofFile = `/uploads/${req.file.filename}`;
     else newEntry.proofFile = null;
 
     database[section].push(newEntry);
-    console.log(`[LOGGED] ${section} | Fields: ${Object.keys(recordData).length} | File: ${req.file ? 'YES' : 'NO'}`);
+    console.log(`[LOGGED] ${section} | Fields: ${Object.keys(recordData).length} | File Attached: ${req.file ? 'YES' : 'NO'}`);
     res.status(201).json({ message: `Success`, entry: newEntry });
 });
 
-// ABSOLUTE PURGE ROUTE
+// ABSOLUTE PURGE ROUTE (Wipes memory arrays & deletes physical files)
 app.delete('/api/purge', (req, res) => {
+    // 1. Wipe memory
     for (let key in database) {
         database[key] = [];
     }
     
+    // 2. Delete physical files securely
     if (fs.existsSync(uploadDir)) {
         fs.readdir(uploadDir, (err, files) => {
             if (!err) {
