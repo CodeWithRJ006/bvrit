@@ -1,5 +1,6 @@
-const API_URL = 'http://localhost:3000/api/report';
-const SERVER_URL = 'http://localhost:3000'; 
+// Relative URLs ensure this works locally AND when deployed on Render.com
+const API_URL = '/api/report';
+const SERVER_URL = window.location.origin; 
 let completedSections = new Set();
 let currentSectionKey = null;
 
@@ -7,7 +8,10 @@ document.addEventListener("DOMContentLoaded", () => {
     initThemeSystem();
     initCanvasBackground();
     renderSidebar();
-    gsap.from('#sidebar-menu button', { x: -20, opacity: 0, stagger: 0.05, duration: 0.4, ease: "power2.out" });
+    
+    // Entrance Animation
+    gsap.from('.gsap-header', { y: -20, opacity: 0, duration: 1, ease: "power3.out" });
+    gsap.from('.sidebar-item', { x: -20, opacity: 0, stagger: 0.05, duration: 0.5, ease: "power2.out" });
 });
 
 // ====== THEME ENGINE ======
@@ -22,6 +26,52 @@ window.setTheme = function(theme, btnElement) {
     localStorage.setItem('vanguard-theme', theme);
     document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
     btnElement.classList.add('active');
+}
+
+// ====== CUSTOM CURSOR ======
+function initCustomCursor() {
+    const cursorDot = document.querySelector('.cursor-dot');
+    const cursorOutline = document.querySelector('.cursor-outline');
+    let mouseX = window.innerWidth/2, mouseY = window.innerHeight/2;
+    let outlineX = mouseX, outlineY = mouseY;
+
+    window.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX; mouseY = e.clientY;
+        cursorDot.style.left = `${mouseX}px`; cursorDot.style.top = `${mouseY}px`;
+    });
+
+    function animateCursor() {
+        outlineX += (mouseX - outlineX) * 0.15;
+        outlineY += (mouseY - outlineY) * 0.15;
+        cursorOutline.style.left = `${outlineX}px`; cursorOutline.style.top = `${outlineY}px`;
+        requestAnimationFrame(animateCursor);
+    }
+    animateCursor();
+
+    document.body.addEventListener('mouseover', (e) => {
+        if (e.target.closest('button, a, input, select, .cursor-hover, .sidebar-item, .theme-btn')) {
+            cursorOutline.style.width = '70px'; cursorOutline.style.height = '70px';
+            cursorOutline.style.backgroundColor = 'rgba(var(--grid-rgb), 0.15)';
+        }
+    });
+    document.body.addEventListener('mouseout', (e) => {
+        if (e.target.closest('button, a, input, select, .cursor-hover, .sidebar-item, .theme-btn')) {
+            cursorOutline.style.width = '40px'; cursorOutline.style.height = '40px';
+            cursorOutline.style.backgroundColor = 'transparent';
+        }
+    });
+}
+
+function initMagneticButtons() {
+    document.querySelectorAll('.magnetic').forEach((elem) => {
+        elem.addEventListener('mousemove', (e) => {
+            const rect = elem.getBoundingClientRect();
+            const x = e.clientX - rect.left - rect.width / 2;
+            const y = e.clientY - rect.top - rect.height / 2;
+            gsap.to(elem, { x: x * 0.3, y: y * 0.3, duration: 0.5, ease: "power3.out" });
+        });
+        elem.addEventListener('mouseleave', () => { gsap.to(elem, { x: 0, y: 0, duration: 0.5, ease: "elastic.out(1, 0.3)" }); });
+    });
 }
 
 // ====== DYNAMIC CANVAS ======
@@ -159,18 +209,18 @@ window.selectSection = function(sectionKey) {
         `;
     });
 
-    // CRITICAL UPDATE: Removed the "required" attribute and updated the label
+    // The required tag is removed here. File upload is completely optional.
     formFields.innerHTML += `
         <div class="flex flex-col group gsap-field md:col-span-2 mt-2 pt-6 border-t v-border">
             <label class="text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] mb-3" style="font-family: 'Space Mono', monospace;"><i class="fa-solid fa-paperclip"></i> Attach File Evidence (Optional)</label>
-            <input type="file" name="proofDocument" accept=".pdf,image/*" class="v-input w-full p-2 rounded-lg text-sm bg-[rgba(var(--bg-rgb),0.5)]">
+            <input type="file" name="proofDocument" accept=".pdf,image/*" class="v-input w-full p-2 rounded-lg text-sm bg-[rgba(var(--bg-rgb),0.5)] cursor-pointer">
         </div>
     `;
 
     gsap.fromTo('.gsap-field', { y: 20, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.05, duration: 0.4, ease: "power2.out" });
 }
 
-// ====== DATA HANDLING & VAULT ======
+// ====== DATA SUBMISSION ======
 window.submitData = async function(event) {
     event.preventDefault();
     if (!currentSectionKey) return;
@@ -200,11 +250,13 @@ window.submitData = async function(event) {
     }
 }
 
+// ====== CACHE-BUSTING VAULT RENDER ======
 window.fetchAndRenderVault = async function() {
     const container = document.getElementById('vault-content');
     container.innerHTML = `<p class="text-center v-text-muted py-10 animate-pulse font-mono">Querying Database...</p>`;
 
     try {
+        // Appending timestamp to the URL forces the browser to skip the cache and pull fresh data
         const fetchUrl = `${API_URL}?t=${new Date().getTime()}`;
         const response = await fetch(fetchUrl, { 
             cache: 'no-store', 
@@ -249,16 +301,16 @@ window.fetchAndRenderVault = async function() {
                     if (isImage) {
                         html += `<td class="py-2 px-4 text-right">
                             <a href="${SERVER_URL}${row.proofFile}" target="_blank">
-                                <img src="${SERVER_URL}${row.proofFile}" class="h-12 w-20 object-cover rounded border v-border inline-block hover:scale-110 transition-transform shadow-lg">
+                                <img src="${SERVER_URL}${row.proofFile}" class="h-12 w-20 object-cover rounded border v-border inline-block hover:scale-110 transition-transform shadow-lg cursor-hover">
                             </a>
                         </td>`;
                     } else {
                         html += `<td class="py-4 px-4 text-right">
-                            <a href="${SERVER_URL}${row.proofFile}" target="_blank" class="text-[10px] border v-border text-[var(--text)] px-4 py-2 rounded font-bold hover:bg-[var(--accent)] hover:text-[var(--accent-text)] transition uppercase tracking-wider"><i class="fa-solid fa-file-pdf mr-1"></i> View PDF</a>
+                            <a href="${SERVER_URL}${row.proofFile}" target="_blank" class="text-[10px] border v-border text-[var(--text)] px-4 py-2 rounded font-bold hover:bg-[var(--accent)] hover:text-[var(--accent-text)] transition uppercase tracking-wider cursor-hover"><i class="fa-solid fa-file-pdf mr-1"></i> View PDF</a>
                         </td>`;
                     }
                 } else {
-                    html += `<td class="py-4 px-4 text-right"><span class="text-xs v-text-muted italic opacity-50 px-4 py-2 border border-transparent rounded">No File Attached</span></td>`;
+                    html += `<td class="py-4 px-4 text-right"><span class="text-[10px] uppercase tracking-wider font-bold v-text-muted italic opacity-50 px-4 py-2 border border-transparent rounded">No File Attached</span></td>`;
                 }
                 html += `</tr>`;
             });
@@ -275,6 +327,7 @@ window.fetchAndRenderVault = async function() {
     }
 }
 
+// ====== PURGE & SEARCH ======
 window.purgeSystem = async function() {
     Swal.fire({
         title: 'Initiate Purge?',
@@ -284,12 +337,18 @@ window.purgeSystem = async function() {
     }).then(async (result) => {
         if (result.isConfirmed) {
             try {
-                await fetch('http://localhost:3000/api/purge', { method: 'DELETE', cache: 'no-store' });
+                // DELETE request with cache bypass
+                await fetch('/api/purge', { method: 'DELETE', cache: 'no-store' });
+                
+                // Clear UI trackers
                 completedSections.clear();
                 document.querySelectorAll('.fa-check').forEach(i => i.classList.add('opacity-0'));
                 document.getElementById('progress-text').innerText = `0 / 17`;
                 document.getElementById('progress-bar').style.width = `0%`;
+                
+                // Instantly re-render vault empty state
                 fetchAndRenderVault();
+                
                 Swal.fire({ title: 'Purged!', text: 'Database wiped.', icon: 'success', background: '#111', color: '#fff' });
             } catch(e) {
                 Swal.fire({ title: 'Error', text: 'Could not contact server.', icon: 'error', background: '#111', color: '#fff' });
@@ -312,6 +371,7 @@ window.filterVault = function() {
     });
 }
 
+// ====== PDF COMPILATION ======
 window.generateReportPDF = async function() {
     Swal.fire({ title: 'Compiling...', background: '#111', color: '#fff', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
 
