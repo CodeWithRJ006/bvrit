@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BVRIT | Central Authentication</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        /* Base Resets */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background-color: #0f1115;
+            color: #ffffff;
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* --- THE GPU-STRESSING AURORA BACKGROUND --- */
+        #aurora-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            /* This 150px blur on moving canvas elements forces heavy GPU rendering */
+            filter: blur(150px); 
+            transform: translate3d(0, 0, 0);
+        }
+
+        /* Overlay pattern to add texture over the fluid */
+        .texture-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            opacity: 0.4;
+        }
+
+        /* --- HEAVY GLASSMORPHISM CARD --- */
+        .premium-glass {
+            position: relative;
+            z-index: 10;
+            background: rgba(20, 22, 30, 0.4);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.8), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            overflow: hidden;
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+
+        /* Elegant Typography */
+        .title-serif { font-family: 'Playfair Display', serif; }
+        
+        /* Premium Inputs */
+        .elegant-input {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+        }
+        .elegant-input:focus {
+            background-color: rgba(255, 255, 255, 0.08);
+            border-color: #8b5cf6; /* Indigo accent */
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+            outline: none;
+            transform: translateY(-2px);
+        }
+        .elegant-input::placeholder { color: rgba(255, 255, 255, 0.4); font-weight: 300; }
+        select.elegant-input option { background-color: #1a1c23; color: #fff; }
+
+        /* Themed Button */
+        .elegant-btn {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: #ffffff;
+            font-weight: 600;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        .elegant-btn::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: all 0.5s ease;
+        }
+        .elegant-btn:hover {
+            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.5);
+            transform: translateY(-2px);
+        }
+        .elegant-btn:hover::before { left: 100%; }
+
+        /* Custom SweetAlert */
+        .swal2-popup.premium-swal {
+            background: rgba(30, 32, 40, 0.9) !important;
+            backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            color: white !important;
+            border-radius: 16px !important;
+            font-family: 'Outfit', sans-serif !important;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="aurora-canvas"></canvas>
+    <div class="texture-overlay"></div>
+
+    <div class="w-full max-w-[440px] p-10 premium-glass opacity-0" id="auth-panel">
+        
+        <div class="text-center mb-10">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 border border-white/10 mb-5 shadow-lg">
+                <i class="fa-solid fa-building-columns text-2xl text-indigo-400"></i>
+            </div>
+            <h1 class="text-4xl font-bold title-serif tracking-wide text-white mb-2">BVRIT</h1>
+            <p class="text-xs uppercase tracking-[0.2em] text-indigo-300 font-semibold mb-1">Weekly Report System</p>
+            <p class="text-[10px] text-gray-400 font-light">Department Management Portal [cite: 38]</p>
+        </div>
+
+        <form id="login-form" onsubmit="handleLogin(event)">
+            <div class="space-y-5">
+                
+                <div class="gsap-element opacity-0 translate-y-4">
+                    <label class="block text-[10px] font-bold uppercase tracking-widest text-gray-300 mb-2 pl-1">Identification</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-4 top-1/2 transform -translate-y-1/2 text-indigo-400 text-sm"></i>
+                        <input type="text" id="username" placeholder="Institutional ID" required class="elegant-input w-full pl-11 pr-4 py-3.5 rounded-xl text-sm">
+                    </div>
+                </div>
+
+                <div class="gsap-element opacity-0 translate-y-4">
+                    <label class="block text-[10px] font-bold uppercase tracking-widest text-gray-300 mb-2 pl-1">Passcode</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-key absolute left-4 top-1/2 transform -translate-y-1/2 text-indigo-400 text-sm"></i>
+                        <input type="password" id="password" placeholder="••••••••" required class="elegant-input w-full pl-11 pr-4 py-3.5 rounded-xl text-sm">
+                    </div>
+                </div>
+
+                <div class="gsap-element opacity-0 translate-y-4">
+                    <label class="block text-[10px] font-bold uppercase tracking-widest text-gray-300 mb-2 pl-1">Authorization Level</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-shield-check absolute left-4 top-1/2 transform -translate-y-1/2 text-indigo-400 text-sm"></i>
+                        <select id="role" class="elegant-input w-full pl-11 pr-4 py-3.5 rounded-xl text-sm appearance-none cursor-pointer">
+                            <option value="faculty">Faculty Member</option>
+                            <option value="coordinator">Department Coordinator</option>
+                            <option value="admin">System Administrator</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none text-xs"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-10 gsap-element opacity-0 translate-y-4">
+                <button type="submit" class="elegant-btn w-full py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg">
+                    Secure Login <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-8 pt-6 border-t border-white/10 text-center gsap-element opacity-0 translate-y-4">
+            <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-2">Demo Access Keys</p>
+            <div class="flex justify-center gap-4 text-xs font-light text-indigo-200">
+                <span><i class="fa-solid fa-circle-user text-[8px] mr-1"></i> faculty1</span>
+                <span><i class="fa-solid fa-asterisk text-[8px] mr-1"></i> pass123</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ====== 1. FLUID AURORA CANVAS ENGINE ======
+        // This calculates physical collision and renders massive gradients that are blurred by CSS
+        function initAuroraEngine() {
+            const canvas = document.getElementById('aurora-canvas');
+            const ctx = canvas.getContext('2d');
+            let width, height;
+            
+            function resize() {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            // The colors defining the elegant institutional aesthetic
+            const colors = [
+                '#312e81', // Deep Indigo
+                '#4c1d95', // Deep Purple
+                '#1e1b4b', // Very Dark Blue
+                '#7c3aed', // Violet
+                '#be185d'  // Deep Rose/Pink accent
+            ];
+
+            class Blob {
+                constructor(color) {
+                    this.radius = Math.random() * 300 + 200;
+                    this.x = Math.random() * width;
+                    this.y = Math.random() * height;
+                    this.vx = (Math.random() - 0.5) * 2;
+                    this.vy = (Math.random() - 0.5) * 2;
+                    this.color = color;
+                }
+                update() {
+                    this.x += this.vx; this.y += this.vy;
+                    // Bounce off walls
+                    if (this.x < -this.radius || this.x > width + this.radius) this.vx *= -1;
+                    if (this.y < -this.radius || this.y > height + this.radius) this.vy *= -1;
+                }
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                }
+            }
+
+            const blobs = colors.map(color => new Blob(color));
+
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+                // Background base color
+                ctx.fillStyle = '#0f1115'; 
+                ctx.fillRect(0, 0, width, height);
+                
+                // Set global composite to blend the blobs smoothly
+                ctx.globalCompositeOperation = 'screen';
+                
+                blobs.forEach(blob => {
+                    blob.update();
+                    blob.draw();
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        // ====== 2. UI ANIMATIONS & PARALLAX ======
+        document.addEventListener("DOMContentLoaded", () => {
+            initAuroraEngine();
+
+            // Entrance GSAP Animation
+            gsap.to('#auth-panel', { opacity: 1, duration: 1.5, ease: "power3.out" });
+            gsap.to('.gsap-element', { y: 0, opacity: 1, stagger: 0.15, duration: 1, ease: "power2.out", delay: 0.2 });
+
+            // Subtle 3D Card Parallax on Mouse Move
+            const card = document.getElementById('auth-panel');
+            document.addEventListener('mousemove', (e) => {
+                const xAxis = (window.innerWidth / 2 - e.pageX) / 60;
+                const yAxis = (window.innerHeight / 2 - e.pageY) / 60;
+                card.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+            });
+            document.addEventListener('mouseleave', () => {
+                card.style.transform = `rotateY(0deg) rotateX(0deg)`;
+                card.style.transition = 'transform 0.5s ease';
+            });
+            card.addEventListener('mouseenter', () => {
+                card.style.transition = 'none';
+            });
+        });
+
+        // ====== 3. AUTHENTICATION LOGIC ======
+        function handleLogin(event) {
+            event.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+
+            // Simple demo validation
+            if ((user === 'faculty1' || user === 'admin1' || user === 'coord1') && pass === 'pass123') {
+                
+                Swal.fire({
+                    title: 'Access Granted',
+                    text: 'Establishing secure session...',
+                    icon: 'success',
+                    customClass: { popup: 'premium-swal' },
+                    showConfirmButton: false,
+                    timer: 1800,
+                    timerProgressBar: true,
+                    willClose: () => {
+                        window.location.href = 'index.html'; // Routes to the main Vanguard Dashboard
+                    }
+                });
+            } else {
+                // Error Shake
+                gsap.fromTo('#auth-panel', 
+                    { x: -10 }, 
+                    { x: 10, duration: 0.1, yoyo: true, repeat: 5, onComplete: () => gsap.set('#auth-panel', {x: 0}) }
+                );
+                
+                Swal.fire({
+                    title: 'Authentication Failed',
+                    text: 'Invalid credentials provided.',
+                    icon: 'error',
+                    customClass: { popup: 'premium-swal' },
+                    confirmButtonColor: '#8b5cf6',
+                    confirmButtonText: 'Retry'
+                });
+            }
+        }
+    </script>
+</body>
+</html>

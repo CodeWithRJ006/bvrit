@@ -1,0 +1,47 @@
+// ==============================================================================
+// VANGUARD ENGINE - DYNAMIC DATABASE ARCHITECTURE v2.0
+// ==============================================================================
+// Description: Vanguard utilizes a high-speed, dynamic NoSQL-style JSON 
+// memory structure for rapid telemetry logging and file referencing.
+// ==============================================================================
+
+COLLECTION: Reports
+DOCUMENT: Weekly_Cycle
+- weekDuration: "23rd March to 28th March"
+- status: "Active"
+- data: { Object containing 17 dynamic arrays corresponding to reporting modules }
+
+// --- MODULE DIRECTORY (Dynamic Keys) ---
+1.  generalPoints           10. hackathons
+2.  facultyJoinedRelieved   11. facultyFDP
+3.  facultyAchievements     12. facultyVisits
+4.  studentAchievements     13. patents
+5.  departmentAchievements  14. vedicPrograms
+6.  facultyEvents           15. placements
+7.  studentEvents           16. mous
+8.  nonTechnicalEvents      17. skillDevelopment
+9.  industryVisits
+
+// --- STANDARD ENTRY SCHEMA ---
+// Every object injected into a module array follows this strict structure:
+
+{
+  "id": "String (Primary Key, auto-generated timestamp)",
+  "timestamp": "String (Locale Date/Time of submission)",
+  
+  // Dynamic Payload (Generated based on selected module)
+  "[Field_1]": "String / Number",
+  "[Field_2]": "String / Number",
+  "[Field_N]": "String / Number",
+  
+  // File Evidence Linkage
+  "proofFile": "String (Relative URL path to physical file stored on server) OR null"
+}
+
+// ==============================================================================
+// FILE STORAGE PROTOCOL
+// Physical files (PDFs/Images) are intercepted via Multer multipart/form-data 
+// parser, sanitized, hashed with a Date.now() prefix to prevent collision, 
+// and stored securely in the /backend/uploads/ directory. The Vanguard Vault 
+// statically serves these files to authorized clients via the proofFile URL path.
+// ==============================================================================
